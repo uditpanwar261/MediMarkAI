@@ -1,5 +1,5 @@
 # MediMark AI — Dockerfile
-# Optimised for Render free tier (512MB RAM)
+# Uses Python 3.11-slim — stable, compatible with all dependencies
 
 FROM python:3.11-slim
 
@@ -17,6 +17,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Upgrade pip first to avoid build issues
+RUN pip install --upgrade pip setuptools wheel
+
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -31,9 +34,7 @@ RUN mkdir -p uploads/originals uploads/processed ml_models
 RUN useradd -m -u 1000 medimark && chown -R medimark:medimark /app
 USER medimark
 
-# Render sets PORT env var automatically
 ENV PORT=5000
 EXPOSE 5000
 
-# Use gunicorn for production
 CMD gunicorn -c gunicorn.conf.py app:app

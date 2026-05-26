@@ -1,6 +1,4 @@
 # MediMark AI — Render Deployment Blueprint
-# Render reads this file automatically.
-# Creates: 1 web service + 1 PostgreSQL database (both free tier).
 
 services:
   - type: web
@@ -9,24 +7,16 @@ services:
     plan: free
     healthCheckPath: /
     autoDeploy: true
-
-    # Render runs this after the Docker image builds
     dockerCommand: "bash -c 'flask --app manage db-init && flask --app manage seed; gunicorn -c gunicorn.conf.py app:app'"
-
     envVars:
-      # Render auto-generates these — no need to set manually
       - key: SECRET_KEY
         generateValue: true
       - key: JWT_SECRET_KEY
         generateValue: true
-
-      # Render injects DATABASE_URL from the linked DB below
       - key: DATABASE_URL
         fromDatabase:
           name: medimark-db
           property: connectionString
-
-      # App settings
       - key: DEBUG
         value: "False"
       - key: UPLOAD_FOLDER
@@ -37,11 +27,11 @@ services:
         value: "ml_models/yolo_medical.pt"
       - key: UNET_MODEL_PATH
         value: "ml_models/unet_medical.h5"
+      - key: PYTHON_VERSION
+        value: "3.11.9"
 
 databases:
   - name: medimark-db
     databaseName: medimark_ai
     user: medimark_user
     plan: free
-    # Note: Render free PostgreSQL expires after 90 days
-    # Upgrade to paid ($7/mo) for permanent storage
