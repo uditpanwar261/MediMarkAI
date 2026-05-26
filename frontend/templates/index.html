@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediMark AI — Medical Image Annotation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+<!-- App Shell -->
+<div id="app" class="app-shell">
+
+  <!-- ─── AUTH SCREEN ──────────────────────────────── -->
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-bg">
+      <div class="auth-bg-pulse"></div>
+      <div class="auth-grid"></div>
+    </div>
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="20" cy="20" r="18" stroke="#00D4FF" stroke-width="1.5"/>
+            <path d="M20 10 L20 30 M10 20 L30 20" stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="20" cy="20" r="4" fill="#00D4FF" opacity="0.3"/>
+            <circle cx="14" cy="14" r="2" fill="#00D4FF" opacity="0.6"/>
+            <circle cx="26" cy="14" r="2" fill="#00D4FF" opacity="0.6"/>
+            <circle cx="14" cy="26" r="2" fill="#00D4FF" opacity="0.6"/>
+            <circle cx="26" cy="26" r="2" fill="#00D4FF" opacity="0.6"/>
+          </svg>
+        </div>
+        <div class="logo-text">
+          <span class="logo-name">MediMark</span>
+          <span class="logo-ai">AI</span>
+        </div>
+      </div>
+      <p class="auth-tagline">AI-Assisted Medical Image Annotation Platform</p>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login">Sign In</button>
+        <button class="auth-tab" data-tab="register">Register</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="login-form" class="auth-form active">
+        <div class="field-group">
+          <label>Email Address</label>
+          <input type="email" id="login-email" placeholder="doctor@hospital.com" required>
+        </div>
+        <div class="field-group">
+          <label>Password</label>
+          <input type="password" id="login-password" placeholder="••••••••" required>
+        </div>
+        <div id="login-error" class="auth-error hidden"></div>
+        <button type="submit" class="btn-primary full-width">
+          <span>Sign In</span>
+          <div class="btn-loader hidden"></div>
+        </button>
+        <p class="demo-hint">Demo: admin@medimark.ai / demo1234</p>
+      </form>
+
+      <!-- Register Form -->
+      <form id="register-form" class="auth-form">
+        <div class="field-row">
+          <div class="field-group">
+            <label>Full Name</label>
+            <input type="text" id="reg-name" placeholder="Dr. Jane Smith" required>
+          </div>
+          <div class="field-group">
+            <label>Role</label>
+            <select id="reg-role">
+              <option value="radiologist">Radiologist</option>
+              <option value="oncologist">Oncologist</option>
+              <option value="pathologist">Pathologist</option>
+              <option value="researcher">Researcher</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-group">
+          <label>Email Address</label>
+          <input type="email" id="reg-email" placeholder="doctor@hospital.com" required>
+        </div>
+        <div class="field-group">
+          <label>Institution</label>
+          <input type="text" id="reg-institution" placeholder="General Hospital">
+        </div>
+        <div class="field-group">
+          <label>Password</label>
+          <input type="password" id="reg-password" placeholder="Min. 8 characters" required>
+        </div>
+        <div id="register-error" class="auth-error hidden"></div>
+        <button type="submit" class="btn-primary full-width">Create Account</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ─── MAIN APP ──────────────────────────────────── -->
+  <div id="main-app" class="main-app hidden">
+
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+            <circle cx="16" cy="16" r="14" stroke="#00D4FF" stroke-width="1.5"/>
+            <path d="M16 8 L16 24 M8 16 L24 16" stroke="#00D4FF" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="16" cy="16" r="3" fill="#00D4FF" opacity="0.4"/>
+          </svg>
+          <span>MediMark <strong>AI</strong></span>
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">Workspace</div>
+        <a href="#" class="nav-item active" data-view="dashboard">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="16"><path d="M3 4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 8a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1v-4zm8-8a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V4zm0 8a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
+          Dashboard
+        </a>
+        <a href="#" class="nav-item" data-view="gallery">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="16"><path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/></svg>
+          Image Library
+        </a>
+        <a href="#" class="nav-item" data-view="annotate">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="16"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+          Annotate
+        </a>
+        <a href="#" class="nav-item" data-view="review">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="16"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+          Review Queue
+        </a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">Data</div>
+        <a href="#" class="nav-item" data-view="export">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="16"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+          Export Data
+        </a>
+        <a href="#" class="nav-item" data-view="models">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="16"><path d="M13 7H7v6h6V7z"/><path fill-rule="evenodd" d="M7 2a1 1 0 012 0v1h2V2a1 1 0 112 0v1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v2h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2v1a1 1 0 11-2 0v-1H9v1a1 1 0 11-2 0v-1H5a2 2 0 01-2-2v-2H2a1 1 0 110-2h1V9H2a1 1 0 010-2h1V5a2 2 0 012-2h2V2zM5 5h10v10H5V5z" clip-rule="evenodd"/></svg>
+          AI Models
+        </a>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="user-card">
+          <div class="user-avatar" id="user-avatar">D</div>
+          <div class="user-info">
+            <span class="user-name" id="sidebar-user-name">Doctor</span>
+            <span class="user-role" id="sidebar-user-role">Radiologist</span>
+          </div>
+          <button class="logout-btn" id="logout-btn" title="Sign out">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="16"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"/></svg>
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="content-area">
+
+      <!-- ─── DASHBOARD VIEW ──────────────────── -->
+      <div id="view-dashboard" class="view active">
+        <div class="view-header">
+          <div>
+            <h1>Dashboard</h1>
+            <p class="view-subtitle">Overview of your annotation workspace</p>
+          </div>
+          <button class="btn-primary" onclick="document.querySelector('[data-view=gallery]').click()">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="16"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+            Upload Image
+          </button>
+        </div>
+
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon stat-icon-blue">
+              <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/></svg>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="stat-total-images">—</span>
+              <span class="stat-label">Total Images</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon stat-icon-cyan">
+              <svg viewBox="0 0 20 20" fill="currentColor"><path d="M13 7H7v6h6V7z"/><path fill-rule="evenodd" d="M7 2a1 1 0 012 0v1h2V2a1 1 0 112 0v1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v2h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2v1a1 1 0 11-2 0v-1H9v1a1 1 0 11-2 0v-1H5a2 2 0 01-2-2v-2H2a1 1 0 110-2h1V9H2a1 1 0 010-2h1V5a2 2 0 012-2h2V2zM5 5h10v10H5V5z" clip-rule="evenodd"/></svg>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="stat-ai-processed">—</span>
+              <span class="stat-label">AI Processed</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon stat-icon-green">
+              <svg viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="stat-annotations">—</span>
+              <span class="stat-label">Annotations</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon stat-icon-amber">
+              <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="stat-approved">—</span>
+              <span class="stat-label">Approved</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="dash-panel">
+            <h3>Recent Images</h3>
+            <div id="recent-images" class="recent-list"></div>
+          </div>
+          <div class="dash-panel">
+            <h3>Model Status</h3>
+            <div id="model-status-display" class="model-status-list"></div>
+            <h3 style="margin-top:24px">Quick Actions</h3>
+            <div class="quick-actions">
+              <button class="quick-action" onclick="document.querySelector('[data-view=gallery]').click()">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="18"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                Upload Images
+              </button>
+              <button class="quick-action" onclick="document.querySelector('[data-view=review]').click()">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="18"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                Review Queue
+              </button>
+              <button class="quick-action" onclick="document.querySelector('[data-view=export]').click()">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="18"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                Export Data
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── GALLERY VIEW ──────────────────────── -->
+      <div id="view-gallery" class="view">
+        <div class="view-header">
+          <div>
+            <h1>Image Library</h1>
+            <p class="view-subtitle">Upload and manage medical images</p>
+          </div>
+          <div class="header-actions">
+            <select id="gallery-filter-status" class="filter-select">
+              <option value="">All Status</option>
+              <option value="uploaded">Uploaded</option>
+              <option value="ai_complete">AI Complete</option>
+              <option value="under_review">Under Review</option>
+              <option value="approved">Approved</option>
+            </select>
+            <select id="gallery-filter-modality" class="filter-select">
+              <option value="">All Modalities</option>
+              <option value="CT">CT Scan</option>
+              <option value="MRI">MRI</option>
+              <option value="X-Ray">X-Ray</option>
+              <option value="Ultrasound">Ultrasound</option>
+              <option value="Mammography">Mammography</option>
+            </select>
+            <label class="btn-primary upload-btn-label">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="16"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+              Upload
+              <input type="file" id="file-upload-input" accept="image/*,.dcm,.tiff,.tif" multiple style="display:none">
+            </label>
+          </div>
+        </div>
+
+        <!-- Upload Panel -->
+        <div id="upload-panel" class="upload-panel hidden">
+          <div class="upload-meta">
+            <select id="upload-modality" class="filter-select">
+              <option value="Other">Modality</option>
+              <option value="CT">CT Scan</option>
+              <option value="MRI">MRI</option>
+              <option value="X-Ray">X-Ray</option>
+              <option value="Ultrasound">Ultrasound</option>
+              <option value="Mammography">Mammography</option>
+            </select>
+            <input type="text" id="upload-body-part" placeholder="Body part (e.g. Chest)" class="filter-input">
+            <input type="text" id="upload-patient-id" placeholder="Patient ID (anonymized)" class="filter-input">
+            <button class="btn-primary" id="confirm-upload-btn">
+              Upload Selected Files
+            </button>
+            <button class="btn-ghost" id="cancel-upload-btn">Cancel</button>
+          </div>
+          <div id="upload-file-list" class="upload-file-list"></div>
+        </div>
+
+        <div id="image-gallery" class="image-gallery"></div>
+        <div class="pagination" id="gallery-pagination"></div>
+      </div>
+
+      <!-- ─── ANNOTATION VIEW ──────────────────── -->
+      <div id="view-annotate" class="view">
+        <div id="no-image-selected" class="no-image-msg">
+          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" width="64">
+            <circle cx="32" cy="32" r="30" stroke="#2a3a4a" stroke-width="2"/>
+            <path d="M32 20 L32 44 M20 32 L44 32" stroke="#2a3a4a" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+          <h3>No Image Selected</h3>
+          <p>Select an image from the Image Library to start annotating</p>
+          <button class="btn-primary" onclick="document.querySelector('[data-view=gallery]').click()">Browse Images</button>
+        </div>
+
+        <div id="annotation-workspace" class="annotation-workspace hidden">
+          <div class="workspace-header">
+            <div class="workspace-image-info">
+              <span id="ws-image-name" class="ws-name">—</span>
+              <span id="ws-image-meta" class="ws-meta">—</span>
+              <span class="status-badge" id="ws-status-badge">—</span>
+            </div>
+            <div class="workspace-actions">
+              <button class="btn-ghost" id="btn-run-ai">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="16"><path d="M13 7H7v6h6V7z"/><path fill-rule="evenodd" d="M7 2a1 1 0 012 0v1h2V2a1 1 0 112 0v1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v2h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2v1a1 1 0 11-2 0v-1H9v1a1 1 0 11-2 0v-1H5a2 2 0 01-2-2v-2H2a1 1 0 110-2h1V9H2a1 1 0 010-2h1V5a2 2 0 012-2h2V2zM5 5h10v10H5V5z" clip-rule="evenodd"/></svg>
+                Run AI Analysis
+              </button>
+              <button class="btn-ghost" id="btn-add-bbox">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="16"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h4a1 1 0 010 2H6.414l2.293 2.293a1 1 0 11-1.414 1.414L5 6.414V8a1 1 0 01-2 0V4zm9 1a1 1 0 010-2h4a1 1 0 011 1v4a1 1 0 01-2 0V6.414l-2.293 2.293a1 1 0 11-1.414-1.414L13.586 5H12zm-9 7a1 1 0 012 0v1.586l2.293-2.293a1 1 0 111.414 1.414L6.414 15H8a1 1 0 010 2H4a1 1 0 01-1-1v-4zm13 2a1 1 0 01-1 1h-1.586l2.293 2.293a1 1 0 01-1.414 1.414L13 17.414V16a1 1 0 012 0v4a1 1 0 01-1 1h-4a1 1 0 010-2h1.586l-2.293-2.293a1 1 0 011.414-1.414L13 13.586V12a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+                Draw Box
+              </button>
+              <button class="btn-success" id="btn-approve-all">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="16"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                Approve All
+              </button>
+            </div>
+          </div>
+
+          <div class="annotation-layout">
+            <!-- Canvas Area -->
+            <div class="canvas-container" id="canvas-container">
+              <canvas id="annotation-canvas"></canvas>
+              <div class="canvas-loader hidden" id="canvas-loader">
+                <div class="loader-spinner"></div>
+                <span>Running AI Analysis...</span>
+              </div>
+              <!-- Zoom Controls -->
+              <div class="zoom-controls">
+                <button class="zoom-btn" id="zoom-in-btn">+</button>
+                <span id="zoom-level">100%</span>
+                <button class="zoom-btn" id="zoom-out-btn">−</button>
+                <button class="zoom-btn" id="zoom-reset-btn">⊙</button>
+              </div>
+            </div>
+
+            <!-- Annotation Panel -->
+            <div class="annotation-panel">
+              <div class="panel-tabs">
+                <button class="panel-tab active" data-panel="annotations">
+                  Annotations
+                  <span class="ann-count" id="ann-count-badge">0</span>
+                </button>
+                <button class="panel-tab" data-panel="add">Add New</button>
+              </div>
+
+              <!-- Annotation List -->
+              <div id="panel-annotations" class="panel-content active">
+                <div id="annotations-list" class="annotations-list"></div>
+              </div>
+
+              <!-- Add Annotation Form -->
+              <div id="panel-add" class="panel-content">
+                <div class="add-annotation-form">
+                  <div class="field-group">
+                    <label>Label / Pathology</label>
+                    <input type="text" id="new-label" placeholder="e.g. Pulmonary Nodule" list="pathology-list">
+                    <datalist id="pathology-list">
+                      <option value="Pulmonary Nodule">
+                      <option value="Ground-glass Opacity">
+                      <option value="Consolidation">
+                      <option value="Pleural Effusion">
+                      <option value="Cardiomegaly">
+                      <option value="Pneumothorax">
+                      <option value="Mass Lesion">
+                      <option value="Calcification">
+                      <option value="Atelectasis">
+                      <option value="Tumor">
+                      <option value="Normal">
+                    </datalist>
+                  </div>
+                  <div class="field-group">
+                    <label>Annotation Type</label>
+                    <select id="new-type">
+                      <option value="bounding_box">Bounding Box</option>
+                      <option value="segmentation">Segmentation</option>
+                      <option value="classification">Classification</option>
+                      <option value="point">Point</option>
+                    </select>
+                  </div>
+                  <div class="field-group">
+                    <label>Severity</label>
+                    <select id="new-severity">
+                      <option value="">Not specified</option>
+                      <option value="normal">Normal</option>
+                      <option value="mild">Mild</option>
+                      <option value="moderate">Moderate</option>
+                      <option value="severe">Severe</option>
+                      <option value="critical">Critical</option>
+                    </select>
+                  </div>
+                  <div class="field-group">
+                    <label>Bounding Box (normalized 0–1)</label>
+                    <div class="bbox-inputs">
+                      <input type="number" id="bb-x1" placeholder="x_min" step="0.001" min="0" max="1">
+                      <input type="number" id="bb-y1" placeholder="y_min" step="0.001" min="0" max="1">
+                      <input type="number" id="bb-x2" placeholder="x_max" step="0.001" min="0" max="1">
+                      <input type="number" id="bb-y2" placeholder="y_max" step="0.001" min="0" max="1">
+                    </div>
+                    <p class="field-hint">Or draw a box on the canvas (Draw Box mode)</p>
+                  </div>
+                  <div class="field-group">
+                    <label>Notes</label>
+                    <textarea id="new-notes" placeholder="Clinical notes..." rows="3"></textarea>
+                  </div>
+                  <button class="btn-primary full-width" id="btn-save-annotation">Save Annotation</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── REVIEW VIEW ──────────────────────── -->
+      <div id="view-review" class="view">
+        <div class="view-header">
+          <div>
+            <h1>Review Queue</h1>
+            <p class="view-subtitle">Images awaiting doctor verification</p>
+          </div>
+        </div>
+        <div id="review-list" class="review-list"></div>
+      </div>
+
+      <!-- ─── EXPORT VIEW ─────────────────────── -->
+      <div id="view-export" class="view">
+        <div class="view-header">
+          <div>
+            <h1>Export Training Data</h1>
+            <p class="view-subtitle">Export verified annotations for AI model training</p>
+          </div>
+        </div>
+        <div class="export-panel">
+          <div class="export-card">
+            <div class="export-icon">
+              <svg viewBox="0 0 40 40" fill="none" width="40"><circle cx="20" cy="20" r="18" stroke="#00D4FF" stroke-width="1.5"/><path d="M20 12v12M14 18l6 6 6-6" stroke="#00D4FF" stroke-width="2" stroke-linecap="round"/></svg>
+            </div>
+            <h3>COCO JSON Format</h3>
+            <p>Standard COCO format for TensorFlow Object Detection, Detectron2, MMDetection</p>
+            <div class="field-group">
+              <label>Image ID</label>
+              <input type="text" id="export-image-id-coco" placeholder="Enter image UUID">
+            </div>
+            <button class="btn-primary" id="btn-export-coco">Export COCO JSON</button>
+          </div>
+          <div class="export-card">
+            <div class="export-icon">
+              <svg viewBox="0 0 40 40" fill="none" width="40"><circle cx="20" cy="20" r="18" stroke="#22c55e" stroke-width="1.5"/><path d="M20 12v12M14 18l6 6 6-6" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/></svg>
+            </div>
+            <h3>YOLO TXT Format</h3>
+            <p>Ultralytics YOLO format for YOLOv5/v8 training pipelines</p>
+            <div class="field-group">
+              <label>Image ID</label>
+              <input type="text" id="export-image-id-yolo" placeholder="Enter image UUID">
+            </div>
+            <button class="btn-primary" id="btn-export-yolo">Export YOLO TXT</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── MODELS VIEW ─────────────────────── -->
+      <div id="view-models" class="view">
+        <div class="view-header">
+          <div>
+            <h1>AI Model Status</h1>
+            <p class="view-subtitle">YOLO detection and U-Net segmentation models</p>
+          </div>
+        </div>
+        <div class="models-grid" id="models-detail-grid"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Toast Notifications -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- Modal -->
+<div id="modal-overlay" class="modal-overlay hidden">
+  <div class="modal-box" id="modal-box">
+    <button class="modal-close" id="modal-close-btn">✕</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script src="/static/js/canvas.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

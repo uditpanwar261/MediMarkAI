@@ -1,0 +1,74 @@
+version: '3.9'
+
+services:
+  # ─── MySQL Database ──────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: medimark_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: medimark_ai
+      MYSQL_USER: medimark_user
+      MYSQL_PASSWORD: medimark_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init_schema.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Flask Backend ───────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: medimark_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      FLASK_ENV: production
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-jwt-secret-change-me}
+      MYSQL_HOST: db
+      MYSQL_PORT: 3306
+      MYSQL_USER: medimark_user
+      MYSQL_PASSWORD: medimark_pass
+      MYSQL_DB: medimark_ai
+      UPLOAD_FOLDER: /app/uploads/originals
+      PROCESSED_FOLDER: /app/uploads/processed
+      YOLO_MODEL_PATH: /app/ml_models/yolo_medical.pt
+      UNET_MODEL_PATH: /app/ml_models/unet_medical.h5
+    ports:
+      - "5000:5000"
+    volumes:
+      - uploads_data:/app/uploads
+      - ./ml_models:/app/ml_models:ro
+    command: gunicorn -w 2 -b 0.0.0.0:5000 --timeout 120 app:app
+
+  # ─── Nginx Reverse Proxy ─────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: medimark_nginx
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - uploads_data:/app/uploads:ro
+
+volumes:
+  mysql_data:
+  uploads_data:

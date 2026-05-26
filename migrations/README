@@ -1,0 +1,7 @@
+"""
+MediMark AI — Alembic / Flask-Migrate Environment
+Run:
+  flask db init      (first time only)
+  flask db migrate -m "description"
+  flask db upgrade
+"""
