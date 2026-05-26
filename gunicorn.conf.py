@@ -1,29 +1,31 @@
-# MediMark AI — Gunicorn Config
-# Optimised for Render free tier (512MB RAM, shared CPU)
+# MediMark AI — Gunicorn Config for Render
 
 import os
-import multiprocessing
 
-# Render injects PORT env var
-bind    = f"0.0.0.0:{os.getenv('PORT', '5000')}"
-backlog = 512
-
-# Render free tier: 512MB RAM — keep workers low
-workers          = int(os.getenv('GUNICORN_WORKERS', '2'))
-worker_class     = 'sync'
-threads          = 1
-timeout          = 120        # AI inference can take time
-keepalive        = 5
-max_requests     = 500
+bind    = f"0.0.0.0:{os.getenv('PORT', '10000')}"
+workers = int(os.getenv('WEB_CONCURRENCY', '1'))
+threads = 1
+timeout = 120
+keepalive = 5
+max_requests = 500
 max_requests_jitter = 50
+loglevel   = 'info'
+accesslog  = '-'
+errorlog   = '-'
+proc_name  = 'medimark_ai'
 
-# Logging
-loglevel        = 'info'
-accesslog       = '-'
-errorlog        = '-'
-access_log_format = '%(h)s "%(r)s" %(s)s %(b)s %(D)sµs'
-
-proc_name = 'medimark_ai'
 
 def on_starting(server):
-    server.log.info("MediMark AI starting on port %s ...", os.getenv('PORT', '5000'))
+    """Create tables and seed data on first startup."""
+    import subprocess, sys
+    server.log.info("Running db-init...")
+    subprocess.run(
+        [sys.executable, '-m', 'flask', '--app', 'manage', 'db-init'],
+        check=False
+    )
+    server.log.info("Running seed...")
+    subprocess.run(
+        [sys.executable, '-m', 'flask', '--app', 'manage', 'seed'],
+        check=False
+    )
+    server.log.info("MediMark AI startup complete.")

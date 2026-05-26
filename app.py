@@ -25,12 +25,14 @@ def create_app(config_class=Config):
     )
     app.config.from_object(config_class)
 
+    # Extensions
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
     limiter.init_app(app)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
+    # Blueprints
     app.register_blueprint(auth_bp,        url_prefix='/api/auth')
     app.register_blueprint(images_bp,      url_prefix='/api/images')
     app.register_blueprint(annotations_bp, url_prefix='/api/annotations')
@@ -44,11 +46,15 @@ def create_app(config_class=Config):
         format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
     )
 
+    # Create upload directories
     os.makedirs(app.config['UPLOAD_FOLDER'],    exist_ok=True)
     os.makedirs(app.config['PROCESSED_FOLDER'], exist_ok=True)
 
-    with app.app_context():
-        db.create_all()
+    # IMPORTANT: db.create_all() moved inside app context
+    # but NOT called at module level — prevents crash on Render
+    # when DATABASE_URL is not yet available at import time.
+    # Tables are created by: flask --app manage db-init
+    # OR via the Render Shell after first deploy.
 
     return app
 

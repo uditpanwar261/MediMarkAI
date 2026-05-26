@@ -1,13 +1,15 @@
-# MediMark AI — Render Deployment Blueprint
+# MediMark AI — Render Blueprint
+# Native Python service (not Docker) — faster builds on free tier
 
 services:
   - type: web
     name: medimark-ai
-    env: docker
+    env: python
     plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn -c gunicorn.conf.py app:app"
     healthCheckPath: /
     autoDeploy: true
-    dockerCommand: "bash -c 'flask --app manage db-init && flask --app manage seed; gunicorn -c gunicorn.conf.py app:app'"
     envVars:
       - key: SECRET_KEY
         generateValue: true
@@ -23,10 +25,6 @@ services:
         value: "uploads/originals"
       - key: PROCESSED_FOLDER
         value: "uploads/processed"
-      - key: YOLO_MODEL_PATH
-        value: "ml_models/yolo_medical.pt"
-      - key: UNET_MODEL_PATH
-        value: "ml_models/unet_medical.h5"
       - key: PYTHON_VERSION
         value: "3.11.9"
 
