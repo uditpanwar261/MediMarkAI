@@ -1,26 +1,61 @@
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
-.env
-venv/
-.venv/
+*.pyd
+.Python
 *.egg-info/
 dist/
 build/
+.eggs/
 
-uploads/
+# Virtual environment
+venv/
+.venv/
+env/
+ENV/
+
+# Environment — NEVER commit this
+.env
+
+# Uploads — patient data, never commit
+uploads/originals/*
+uploads/processed/*
+!uploads/originals/.gitkeep
+!uploads/processed/.gitkeep
+
+# AI model weights — too large for git
 ml_models/*.pt
-ml_models/*.h5
 ml_models/*.pth
+ml_models/*.h5
 ml_models/*.pb
+ml_models/*.onnx
+ml_models/*.weights
 
+# Database
 *.db
 *.sqlite3
+*.sqlite
 
+# OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Logs
 *.log
-instance/
+logs/
 
-node_modules/
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Migrations (keep folder, ignore auto-generated versions)
+migrations/versions/*.py
