@@ -1,16 +1,15 @@
 """
-MediMark AI - Medical Image Routes
+MediMark AI — Image Routes
+Handles upload, listing, serving, and stats.
+Render-compatible: stores files in /tmp for free tier.
 """
 
-from flask import Blueprint, request, jsonify, current_app, send_file
+from flask import Blueprint, request, jsonify, current_app, send_file, Response
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 from backend.extensions import db
 from backend.models.database import MedicalImage, AuditLog
-import os
-import uuid
-import cv2
-import numpy as np
+import os, uuid, cv2, numpy as np, base64
 from pathlib import Path
 
 images_bp = Blueprint('images', __name__)
@@ -18,15 +17,51 @@ images_bp = Blueprint('images', __name__)
 
 def allowed_file(filename: str) -> bool:
     ext = Path(filename).suffix.lower().lstrip('.')
-    return ext in current_app.config['ALLOWED_EXTENSIONS']
+    return ext in current_app.config.get('ALLOWED_EXTENSIONS',
+        {'png','jpg','jpeg','tiff','tif','dcm','bmp','webp'})
 
 
-def get_image_dimensions(file_path: str):
-    img = cv2.imread(file_path)
-    if img is not None:
-        h, w = img.shape[:2]
-        c = img.shape[2] if len(img.shape) == 3 else 1
-        return w, h, c
+def get_upload_folder():
+    """Use /tmp on Render (no persistent disk on free tier)."""
+    folder = os.environ.get('UPLOAD_FOLDER', 'uploads/originals')
+    # If relative path doesn't exist, fall back to /tmp
+    if not os.path.isabs(folder):
+        abs_folder = os.path.join(os.getcwd(), folder)
+        if not os.path.exists(abs_folder):
+            try:
+                os.makedirs(abs_folder, exist_ok=True)
+            except Exception:
+                abs_folder = '/tmp/medimark_uploads'
+                os.makedirs(abs_folder, exist_ok=True)
+        return abs_folder
+    os.makedirs(folder, exist_ok=True)
+    return folder
+
+
+def get_processed_folder():
+    folder = os.environ.get('PROCESSED_FOLDER', 'uploads/processed')
+    if not os.path.isabs(folder):
+        abs_folder = os.path.join(os.getcwd(), folder)
+        if not os.path.exists(abs_folder):
+            try:
+                os.makedirs(abs_folder, exist_ok=True)
+            except Exception:
+                abs_folder = '/tmp/medimark_processed'
+                os.makedirs(abs_folder, exist_ok=True)
+        return abs_folder
+    os.makedirs(folder, exist_ok=True)
+    return folder
+
+
+def get_image_dimensions(file_path):
+    try:
+        img = cv2.imread(file_path)
+        if img is not None:
+            h, w = img.shape[:2]
+            c = img.shape[2] if len(img.shape) == 3 else 1
+            return w, h, c
+    except Exception:
+        pass
     return None, None, None
 
 
@@ -46,17 +81,14 @@ def upload_image():
     ext = Path(original_filename).suffix.lower()
     unique_filename = f"{uuid.uuid4().hex}{ext}"
 
-    upload_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
-    os.makedirs(os.path.dirname(upload_path), exist_ok=True)
+    upload_folder = get_upload_folder()
+    upload_path   = os.path.join(upload_folder, unique_filename)
     file.save(upload_path)
 
-    # Get image dimensions
     w, h, c = get_image_dimensions(upload_path)
 
-    # Determine MIME type
-    mime_map = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-                '.png': 'image/png', '.tiff': 'image/tiff',
-                '.tif': 'image/tiff', '.dcm': 'application/dicom'}
+    mime_map = {'.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.png':'image/png',
+                '.tiff':'image/tiff', '.tif':'image/tiff', '.dcm':'application/dicom'}
     mime_type = mime_map.get(ext, 'image/jpeg')
 
     # Generate thumbnail
@@ -65,15 +97,14 @@ def upload_image():
         img = cv2.imread(upload_path)
         if img is not None:
             thumb = cv2.resize(img, (256, 256), interpolation=cv2.INTER_AREA)
-            thumb_filename = f"thumb_{unique_filename.replace(ext, '.jpg')}"
-            thumb_path = os.path.join(current_app.config['PROCESSED_FOLDER'], thumb_filename)
-            os.makedirs(os.path.dirname(thumb_path), exist_ok=True)
+            proc_folder = get_processed_folder()
+            thumb_name  = f"thumb_{unique_filename.replace(ext, '.jpg')}"
+            thumb_path  = os.path.join(proc_folder, thumb_name)
             cv2.imwrite(thumb_path, thumb)
-            thumbnail_filename = thumb_filename
+            thumbnail_filename = thumb_name
     except Exception:
         pass
 
-    # Create DB record
     image = MedicalImage(
         filename=unique_filename,
         original_filename=original_filename,
@@ -84,56 +115,38 @@ def upload_image():
         modality=request.form.get('modality', 'Other'),
         body_part=request.form.get('body_part'),
         patient_id=request.form.get('patient_id'),
-        study_description=request.form.get('study_description'),
         project_id=request.form.get('project_id'),
-        width=w,
-        height=h,
-        channels=c,
+        width=w, height=h, channels=c,
         uploaded_by=user_id,
         status='uploaded'
     )
     db.session.add(image)
     db.session.commit()
-
-    try:
-        AuditLog.log(user_id, 'image_upload', 'medical_image', image.id,
-                     f"Uploaded {original_filename}", request.remote_addr)
-    except Exception:
-        pass
-
-    return jsonify({
-        'message': 'Image uploaded successfully',
-        'image': image.to_dict()
-    }), 201
+    return jsonify({'message': 'Image uploaded', 'image': image.to_dict()}), 201
 
 
 @images_bp.route('/', methods=['GET'])
 @jwt_required()
 def list_images():
-    page = request.args.get('page', 1, type=int)
+    page     = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 24, type=int)
-    status_filter = request.args.get('status')
-    modality_filter = request.args.get('modality')
-    project_id = request.args.get('project_id')
+    status_f   = request.args.get('status')
+    modality_f = request.args.get('modality')
+    project_f  = request.args.get('project_id')
 
-    query = MedicalImage.query
+    q = MedicalImage.query
+    if status_f:   q = q.filter_by(status=status_f)
+    if modality_f: q = q.filter_by(modality=modality_f)
+    if project_f:  q = q.filter_by(project_id=project_f)
+    q = q.order_by(MedicalImage.created_at.desc())
 
-    if status_filter:
-        query = query.filter_by(status=status_filter)
-    if modality_filter:
-        query = query.filter_by(modality=modality_filter)
-    if project_id:
-        query = query.filter_by(project_id=project_id)
-
-    query = query.order_by(MedicalImage.created_at.desc())
-    paginated = query.paginate(page=page, per_page=min(per_page, 100), error_out=False)
-
+    pag = q.paginate(page=page, per_page=min(per_page, 100), error_out=False)
     return jsonify({
-        'images': [img.to_dict() for img in paginated.items],
-        'total': paginated.total,
-        'pages': paginated.pages,
+        'images':       [img.to_dict() for img in pag.items],
+        'total':        pag.total,
+        'pages':        pag.pages,
         'current_page': page,
-        'per_page': per_page
+        'per_page':     per_page,
     })
 
 
@@ -148,9 +161,18 @@ def get_image(image_id):
 @jwt_required()
 def serve_image_file(image_id):
     image = MedicalImage.query.get_or_404(image_id)
-    if not os.path.exists(image.file_path):
-        return jsonify({'error': 'File not found on disk'}), 404
-    return send_file(image.file_path, mimetype=image.mime_type or 'image/jpeg')
+
+    # Try to serve from disk
+    if image.file_path and os.path.exists(image.file_path):
+        return send_file(image.file_path,
+                         mimetype=image.mime_type or 'image/jpeg')
+
+    # File missing (Render free tier disk reset) — return 404 with message
+    return jsonify({
+        'error': 'Image file not found on disk. '
+                 'On Render free tier, uploaded files are lost on restart. '
+                 'Please re-upload the image.'
+    }), 404
 
 
 @images_bp.route('/<image_id>/thumbnail', methods=['GET'])
@@ -158,8 +180,8 @@ def serve_image_file(image_id):
 def serve_thumbnail(image_id):
     image = MedicalImage.query.get_or_404(image_id)
     if image.thumbnail_path:
-        thumb_path = os.path.join(current_app.config['PROCESSED_FOLDER'],
-                                   image.thumbnail_path)
+        proc_folder = get_processed_folder()
+        thumb_path  = os.path.join(proc_folder, image.thumbnail_path)
         if os.path.exists(thumb_path):
             return send_file(thumb_path, mimetype='image/jpeg')
     # Fallback to original
@@ -170,26 +192,14 @@ def serve_thumbnail(image_id):
 @jwt_required()
 def delete_image(image_id):
     user_id = get_jwt_identity()
-    image = MedicalImage.query.get_or_404(image_id)
-
-    # Delete files
-    for path in [image.file_path, image.processed_path]:
+    image   = MedicalImage.query.get_or_404(image_id)
+    for path in [image.file_path]:
         if path and os.path.exists(path):
-            try:
-                os.remove(path)
-            except Exception:
-                pass
-
+            try: os.remove(path)
+            except Exception: pass
     db.session.delete(image)
     db.session.commit()
-
-    try:
-        AuditLog.log(user_id, 'image_delete', 'medical_image', image_id,
-                     f"Deleted {image.original_filename}", request.remote_addr)
-    except Exception:
-        pass
-
-    return jsonify({'message': 'Image deleted successfully'})
+    return jsonify({'message': 'Image deleted'})
 
 
 @images_bp.route('/stats', methods=['GET'])
@@ -198,12 +208,12 @@ def get_stats():
     from sqlalchemy import func
     from backend.models.database import Annotation
 
-    total_images = MedicalImage.query.count()
-    total_annotations = Annotation.query.filter_by(is_active=True).count()
-    ai_processed = MedicalImage.query.filter_by(ai_processed=True).count()
-    approved = MedicalImage.query.filter_by(status='approved').count()
+    total       = MedicalImage.query.count()
+    annotations = Annotation.query.filter_by(is_active=True).count()
+    ai_done     = MedicalImage.query.filter_by(ai_processed=True).count()
+    approved    = MedicalImage.query.filter_by(status='approved').count()
 
-    modality_counts = db.session.query(
+    mod_counts = db.session.query(
         MedicalImage.modality, func.count(MedicalImage.id)
     ).group_by(MedicalImage.modality).all()
 
@@ -212,10 +222,10 @@ def get_stats():
     ).group_by(MedicalImage.status).all()
 
     return jsonify({
-        'total_images': total_images,
-        'total_annotations': total_annotations,
-        'ai_processed': ai_processed,
-        'approved': approved,
-        'by_modality': {m: c for m, c in modality_counts},
-        'by_status': {s: c for s, c in status_counts}
+        'total_images':      total,
+        'total_annotations': annotations,
+        'ai_processed':      ai_done,
+        'approved':          approved,
+        'by_modality':       {m: c for m, c in mod_counts},
+        'by_status':         {s: c for s, c in status_counts},
     })
