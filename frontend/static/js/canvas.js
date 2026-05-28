@@ -34,18 +34,34 @@ class AnnotationCanvas {
   // ─── IMAGE LOADING ───────────────────────────────────────────
   loadImage(src) {
     return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'use-credentials';
-      img.onload = () => {
-        this.image = img;
-        this.imageNaturalW = img.naturalWidth;
-        this.imageNaturalH = img.naturalHeight;
-        this._fitToContainer();
-        this.render();
-        resolve(img);
+      const tryLoad = (url, crossOrigin) => {
+        const img = new Image();
+        if (crossOrigin) img.crossOrigin = crossOrigin;
+
+        img.onload = () => {
+          this.image = img;
+          this.imageNaturalW = img.naturalWidth;
+          this.imageNaturalH = img.naturalHeight;
+          this._fitToContainer();
+          this.render();
+          resolve(img);
+        };
+
+        img.onerror = () => {
+          // If anonymous CORS failed, retry without crossOrigin
+          if (crossOrigin === 'anonymous') {
+            tryLoad(url, null);
+          } else {
+            reject(new Error(`Failed to load image: ${url}`));
+          }
+        };
+
+        img.src = url;
       };
-      img.onerror = reject;
-      img.src = src;
+
+      // Cloudinary / external URLs: try anonymous first
+      const isExternal = src.startsWith('http://') || src.startsWith('https://');
+      tryLoad(src, isExternal ? 'anonymous' : 'use-credentials');
     });
   }
 

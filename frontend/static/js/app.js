@@ -437,22 +437,38 @@ async function openImageForAnnotation(img) {
   statusBadge.textContent = img.status.replace('_', ' ');
   statusBadge.className = `status-badge status-pill ${img.status}`;
 
-  // Load image onto canvas
   const loader = document.getElementById('canvas-loader');
   loader.classList.remove('hidden');
   loader.querySelector('span').textContent = 'Loading image...';
 
   try {
+    // Always fetch fresh image record to get latest file_path (Cloudinary URL)
+    const freshImg = await API.images.get(img.id);
+    State.currentImage = freshImg;
+
     canvas.clear();
-    // Pass file_path so Cloudinary URLs load directly without auth redirect
-    const imageUrl = API.images.fileUrl(img.id, img.file_path);
-    const urlWithCache = imageUrl.startsWith('http') ? imageUrl : `${imageUrl}?t=${Date.now()}`;
-    await canvas.loadImage(urlWithCache);
+
+    // Build the best URL to load
+    let imageUrl;
+
+    if (freshImg.file_path && freshImg.file_path.startsWith('http')) {
+      // Cloudinary URL — use our proxy endpoint to avoid CORS issues
+      // The /file route redirects to Cloudinary, canvas needs direct URL
+      // So we use the Cloudinary URL directly with crossOrigin
+      imageUrl = freshImg.file_path;
+    } else {
+      // Local/API route — add JWT token as query param so canvas can fetch it
+      const token = API.getToken();
+      imageUrl = `/api/images/${img.id}/file?token=${token}&t=${Date.now()}`;
+    }
+
+    await canvas.loadImage(imageUrl);
     loader.classList.add('hidden');
     loadAnnotations();
   } catch (err) {
+    console.error('Image load error:', err);
     loader.querySelector('span').textContent = 'Failed to load image';
-    toast('Could not load image file', 'error');
+    toast('Could not load image. Please try re-uploading.', 'error');
   }
 }
 

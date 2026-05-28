@@ -146,22 +146,56 @@ def get_image(image_id):
 
 
 @images_bp.route('/<image_id>/file', methods=['GET'])
-@jwt_required()
 def serve_image_file(image_id):
-    image = MedicalImage.query.get_or_404(image_id)
+    """
+    Serve image file. Accepts JWT via:
+    - Authorization header (normal API calls)
+    - ?token= query param (canvas img.src direct loads)
+    """
+    from flask_jwt_extended import decode_token
+    from flask_jwt_extended.exceptions import JWTDecodeError
 
-    path = image.file_path
+    # Try header auth first
+    auth_header = request.headers.get('Authorization', '')
+    token_param = request.args.get('token', '')
+
+    user_id = None
+    if auth_header.startswith('Bearer '):
+        try:
+            from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
+            verify_jwt_in_request()
+            user_id = get_jwt_identity()
+        except Exception:
+            pass
+
+    if not user_id and token_param:
+        try:
+            decoded = decode_token(token_param)
+            user_id = decoded.get('sub')
+        except Exception:
+            pass
+
+    if not user_id:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    image = MedicalImage.query.get_or_404(image_id)
+    path  = image.file_path
+
     if not path:
         return jsonify({'error': 'No file path stored'}), 404
 
-    # If it's a Cloudinary URL, redirect browser to it
+    # Cloudinary or external URL — redirect browser
     if path.startswith('http://') or path.startswith('https://'):
         from flask import redirect
-        return redirect(path)
+        response = redirect(path)
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response
 
     # Local file
     if os.path.exists(path):
-        return send_file(path, mimetype=image.mime_type or 'image/jpeg')
+        response = send_file(path, mimetype=image.mime_type or 'image/jpeg')
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response
 
     return jsonify({'error': 'File not found. Please re-upload.'}), 404
 

@@ -42,10 +42,12 @@ def upload_image(file_path: str, public_id: str = None, folder: str = 'medimark'
         cloudinary = _get_cloudinary()
         result = cloudinary.uploader.upload(
             file_path,
-            public_id = public_id,
-            folder    = folder,
+            public_id     = public_id,
+            folder        = folder,
             resource_type = 'image',
-            overwrite = True,
+            overwrite     = True,
+            # Allow cross-origin access from any domain (needed for Canvas)
+            access_mode   = 'public',
             transformation = [{'quality': 'auto', 'fetch_format': 'auto'}]
         )
         return {
