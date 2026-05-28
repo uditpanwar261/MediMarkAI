@@ -217,7 +217,7 @@ async function loadDashboard() {
         el.className = 'recent-item';
         el.innerHTML = `
           <div class="recent-thumb">
-            <img src="${API.images.thumbUrl(img.id)}" alt="${img.original_filename}"
+            <img src="${API.images.thumbUrl(img.id, img.thumbnail_path)}" alt="${img.original_filename}"
                  onerror="this.parentElement.innerHTML='<span>No thumb</span>'" loading="lazy">
           </div>
           <div class="recent-info">
@@ -367,7 +367,7 @@ async function loadGallery(page = 1) {
       card.className = 'gallery-card';
       card.innerHTML = `
         <div class="gallery-thumb">
-          <img src="${API.images.thumbUrl(img.id)}" alt="${img.original_filename}"
+          <img src="${API.images.thumbUrl(img.id, img.thumbnail_path)}" alt="${img.original_filename}"
                loading="lazy"
                onerror="this.parentElement.innerHTML=this.parentElement.innerHTML.replace(this.outerHTML,'<div class=gallery-thumb-placeholder><svg viewBox=\\'0 0 24 24\\' width=\\'28\\' fill=\\'none\\'><rect x=\\'3\\' y=\\'3\\' width=\\'18\\' height=\\'18\\' rx=\\'2\\' stroke=\\'currentColor\\' stroke-width=\\'1.5\\'/><circle cx=\\'8.5\\' cy=\\'8.5\\' r=\\'1.5\\' fill=\\'currentColor\\'/><path d=\\'M21 15l-5-5L5 21\\' stroke=\\'currentColor\\' stroke-width=\\'1.5\\'  stroke-linecap=\\'round\\'/></svg><span>${img.modality}</span></div>')">
           ${img.ai_processed ? '<span class="gallery-ai-badge">AI</span>' : ''}
@@ -444,7 +444,10 @@ async function openImageForAnnotation(img) {
 
   try {
     canvas.clear();
-    await canvas.loadImage(`${API.images.fileUrl(img.id)}?t=${Date.now()}`);
+    // Pass file_path so Cloudinary URLs load directly without auth redirect
+    const imageUrl = API.images.fileUrl(img.id, img.file_path);
+    const urlWithCache = imageUrl.startsWith('http') ? imageUrl : `${imageUrl}?t=${Date.now()}`;
+    await canvas.loadImage(urlWithCache);
     loader.classList.add('hidden');
     loadAnnotations();
   } catch (err) {
@@ -734,7 +737,7 @@ async function loadReviewQueue() {
       card.className = 'review-card';
       card.innerHTML = `
         <div class="review-thumb">
-          <img src="${API.images.thumbUrl(img.id)}" alt="${img.original_filename}"
+          <img src="${API.images.thumbUrl(img.id, img.thumbnail_path)}" alt="${img.original_filename}"
                onerror="this.textContent='📷'" loading="lazy">
         </div>
         <div class="review-info">

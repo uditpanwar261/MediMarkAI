@@ -86,6 +86,9 @@ class MedicalImage(db.Model):
                                     lazy='dynamic', cascade='all, delete-orphan')
 
     def to_dict(self, include_annotations=False):
+        # Expose Cloudinary URLs directly so frontend can load images without auth redirect
+        file_path  = self.file_path  or ''
+        thumb_path = self.thumbnail_path or ''
         data = {
             'id':                self.id,
             'filename':          self.filename,
@@ -99,6 +102,9 @@ class MedicalImage(db.Model):
             'ai_processed':      self.ai_processed,
             'created_at':        self.created_at.isoformat() if self.created_at else None,
             'annotation_count':  self.annotations.count(),
+            # Include cloud URLs if available — empty string if local path
+            'file_path':      file_path  if file_path.startswith('http')  else '',
+            'thumbnail_path': thumb_path if thumb_path.startswith('http') else '',
         }
         if include_annotations:
             data['annotations'] = [a.to_dict() for a in self.annotations.all()]
