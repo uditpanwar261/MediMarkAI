@@ -56,7 +56,10 @@ def _get_local_path(image: MedicalImage) -> str:
 @jwt_required()
 def analyze_image(image_id):
     user_id = get_jwt_identity()
-    image   = MedicalImage.query.get_or_404(image_id)
+    # SECURITY: verify image belongs to this user
+    image = MedicalImage.query.filter_by(
+        id=image_id, uploaded_by=user_id
+    ).first_or_404()
 
     # Return cached result unless force_rerun requested
     if image.ai_processed and not request.json.get('force_rerun', False):
@@ -158,6 +161,7 @@ def analyze_image(image_id):
 @ai_bp.route('/batch-analyze', methods=['POST'])
 @jwt_required()
 def batch_analyze():
+    user_id   = get_jwt_identity()
     data      = request.get_json()
     image_ids = data.get('image_ids', [])
     if not image_ids:
@@ -166,7 +170,8 @@ def batch_analyze():
         return jsonify({'error': 'Maximum 20 images per batch'}), 400
     results = []
     for iid in image_ids:
-        img = MedicalImage.query.get(iid)
+        # SECURITY: only queue images owned by this user
+        img = MedicalImage.query.filter_by(id=iid, uploaded_by=user_id).first()
         if img:
             img.status = 'processing'
             results.append({'image_id': iid, 'status': 'queued'})

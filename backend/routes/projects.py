@@ -14,8 +14,10 @@ projects_bp = Blueprint('projects', __name__)
 @projects_bp.route('/', methods=['GET'])
 @jwt_required()
 def list_projects():
-    status = request.args.get('status')
-    query = Project.query
+    user_id = get_jwt_identity()
+    status  = request.args.get('status')
+    # SECURITY: only return this user's projects
+    query = Project.query.filter_by(created_by=user_id)
     if status:
         query = query.filter_by(status=status)
     projects = query.order_by(Project.created_at.desc()).all()

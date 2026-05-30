@@ -118,13 +118,15 @@ def upload_image():
 @images_bp.route('/', methods=['GET'])
 @jwt_required()
 def list_images():
+    user_id    = get_jwt_identity()
     page       = request.args.get('page', 1, type=int)
     per_page   = request.args.get('per_page', 24, type=int)
     status_f   = request.args.get('status')
     modality_f = request.args.get('modality')
     project_f  = request.args.get('project_id')
 
-    q = MedicalImage.query
+    # SECURITY: always filter by the logged-in user
+    q = MedicalImage.query.filter_by(uploaded_by=user_id)
     if status_f:   q = q.filter_by(status=status_f)
     if modality_f: q = q.filter_by(modality=modality_f)
     if project_f:  q = q.filter_by(project_id=project_f)
@@ -141,7 +143,8 @@ def list_images():
 @images_bp.route('/<image_id>', methods=['GET'])
 @jwt_required()
 def get_image(image_id):
-    image = MedicalImage.query.get_or_404(image_id)
+    user_id = get_jwt_identity()
+    image   = MedicalImage.query.filter_by(id=image_id, uploaded_by=user_id).first_or_404()
     return jsonify(image.to_dict(include_annotations=True))
 
 
@@ -178,7 +181,8 @@ def serve_image_file(image_id):
     if not user_id:
         return jsonify({'error': 'Unauthorized'}), 401
 
-    image = MedicalImage.query.get_or_404(image_id)
+    # SECURITY: verify the image belongs to this user
+    image = MedicalImage.query.filter_by(id=image_id, uploaded_by=user_id).first_or_404()
     path  = image.file_path
 
     if not path:
@@ -203,8 +207,9 @@ def serve_image_file(image_id):
 @images_bp.route('/<image_id>/thumbnail', methods=['GET'])
 @jwt_required()
 def serve_thumbnail(image_id):
-    image = MedicalImage.query.get_or_404(image_id)
-    thumb = image.thumbnail_path
+    user_id = get_jwt_identity()
+    image   = MedicalImage.query.filter_by(id=image_id, uploaded_by=user_id).first_or_404()
+    thumb   = image.thumbnail_path
 
     if thumb:
         if thumb.startswith('http://') or thumb.startswith('https://'):
@@ -220,8 +225,9 @@ def serve_thumbnail(image_id):
 @images_bp.route('/<image_id>', methods=['DELETE'])
 @jwt_required()
 def delete_image(image_id):
-    image = MedicalImage.query.get_or_404(image_id)
-    # Delete from local disk if applicable
+    user_id = get_jwt_identity()
+    # SECURITY: only owner can delete their own image
+    image = MedicalImage.query.filter_by(id=image_id, uploaded_by=user_id).first_or_404()
     if image.file_path and not image.file_path.startswith('http'):
         try: os.remove(image.file_path)
         except Exception: pass
@@ -236,18 +242,28 @@ def get_stats():
     from sqlalchemy import func
     from backend.models.database import Annotation
 
-    total       = MedicalImage.query.count()
-    annotations = Annotation.query.filter_by(is_active=True).count()
-    ai_done     = MedicalImage.query.filter_by(ai_processed=True).count()
-    approved    = MedicalImage.query.filter_by(status='approved').count()
+    user_id = get_jwt_identity()
+
+    # SECURITY: all stats scoped to current user only
+    total   = MedicalImage.query.filter_by(uploaded_by=user_id).count()
+    ai_done = MedicalImage.query.filter_by(uploaded_by=user_id, ai_processed=True).count()
+    approved= MedicalImage.query.filter_by(uploaded_by=user_id, status='approved').count()
+
+    # Count annotations only for this user's images
+    annotations = db.session.query(func.count(Annotation.id)).join(
+        MedicalImage, Annotation.image_id == MedicalImage.id
+    ).filter(
+        MedicalImage.uploaded_by == user_id,
+        Annotation.is_active == True
+    ).scalar() or 0
 
     mod_counts = db.session.query(
         MedicalImage.modality, func.count(MedicalImage.id)
-    ).group_by(MedicalImage.modality).all()
+    ).filter_by(uploaded_by=user_id).group_by(MedicalImage.modality).all()
 
     status_counts = db.session.query(
         MedicalImage.status, func.count(MedicalImage.id)
-    ).group_by(MedicalImage.status).all()
+    ).filter_by(uploaded_by=user_id).group_by(MedicalImage.status).all()
 
     return jsonify({
         'total_images':      total,
