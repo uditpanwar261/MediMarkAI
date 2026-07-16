@@ -1,6 +1,6 @@
 """
 MediMark AI — Image Routes
-Cloudinary-first storage with local disk fallback.
+AWS S3-first storage (private bucket, presigned URLs) with local disk fallback.
 Solves Render free tier ephemeral filesystem issue.
 """
 
@@ -9,11 +9,12 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 from backend.extensions import db
 from backend.models.database import MedicalImage
-from backend.utils.cloudinary_helper import (
-    upload_image as cloud_upload,
-    upload_thumbnail as cloud_upload_thumb,
-    delete_image as cloud_delete,
-    CLOUDINARY_CONFIGURED
+from backend.utils.s3_helper import (
+    upload_image as s3_upload,
+    upload_thumbnail as s3_upload_thumb,
+    delete_image as s3_delete,
+    get_presigned_url,
+    S3_CONFIGURED
 )
 import os, uuid, cv2
 from pathlib import Path
@@ -26,7 +27,7 @@ def allowed_file(filename):
     return Path(filename).suffix.lower().lstrip('.') in ALLOWED_EXTENSIONS
 
 def get_tmp_folder(sub='originals'):
-    """Always use /tmp on Render — just for processing, then upload to Cloudinary."""
+    """Always use /tmp on Render — just for processing, then upload to S3."""
     folder = f'/tmp/medimark_{sub}'
     os.makedirs(folder, exist_ok=True)
     return folder
@@ -69,15 +70,13 @@ def upload_image():
                 '.tiff':'image/tiff','.tif':'image/tiff','.dcm':'application/dicom'}
     mime_type = mime_map.get(ext, 'image/jpeg')
 
-    # ── Upload to Cloudinary if configured ──────────────────
-    cloudinary_url      = None
-    cloudinary_thumb    = None
-    cloudinary_public_id = None
+    # ── Upload to S3 if configured ───────────────────────────
+    s3_key       = None
+    s3_thumb_key = None
 
-    if CLOUDINARY_CONFIGURED:
-        result = cloud_upload(tmp_path, public_id=unique_id, folder='medimark/originals')
-        cloudinary_url       = result.get('url')
-        cloudinary_public_id = result.get('public_id')
+    if S3_CONFIGURED:
+        result = s3_upload(tmp_path, public_id=unique_id, folder='medimark/originals')
+        s3_key = result.get('key')
 
         # Generate thumbnail and upload
         try:
@@ -85,20 +84,21 @@ def upload_image():
             thumb = cv2.resize(img, (256, 256), interpolation=cv2.INTER_AREA)
             thumb_tmp = os.path.join(get_tmp_folder('thumbs'), f"thumb_{unique_filename.replace(ext,'.jpg')}")
             cv2.imwrite(thumb_tmp, thumb)
-            cloudinary_thumb = cloud_upload_thumb(thumb_tmp, public_id=f"thumb_{unique_id}")
+            s3_thumb_key = s3_upload_thumb(thumb_tmp, public_id=f"thumb_{unique_id}")
         except Exception:
             pass
 
     # ── Determine file_path to store ────────────────────────
-    # If Cloudinary worked, store the CDN URL; else store local tmp path
-    stored_path = cloudinary_url if cloudinary_url else tmp_path
-    thumb_path  = cloudinary_thumb if cloudinary_thumb else None
+    # If S3 worked, store an "s3://<key>" marker (bucket is private — a fresh
+    # presigned URL is generated on every serve request); else local tmp path
+    stored_path = f"s3://{s3_key}" if s3_key else tmp_path
+    thumb_path  = f"s3://{s3_thumb_key}" if s3_thumb_key else None
 
     image = MedicalImage(
         filename          = unique_filename,
         original_filename = original_filename,
-        file_path         = stored_path,          # Cloudinary URL or tmp path
-        thumbnail_path    = thumb_path,            # Cloudinary URL or None
+        file_path         = stored_path,          # s3://<key> or local tmp path
+        thumbnail_path    = thumb_path,            # s3://<key> or None
         file_size         = os.path.getsize(tmp_path),
         mime_type         = mime_type,
         modality          = request.form.get('modality', 'Other'),
@@ -188,7 +188,18 @@ def serve_image_file(image_id):
     if not path:
         return jsonify({'error': 'No file path stored'}), 404
 
-    # Cloudinary or external URL — redirect browser
+    # S3 — bucket is private, so generate a fresh short-lived presigned URL
+    if path.startswith('s3://'):
+        key = path[len('s3://'):]
+        url = get_presigned_url(key)
+        if not url:
+            return jsonify({'error': 'File not accessible'}), 404
+        from flask import redirect
+        response = redirect(url)
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response
+
+    # Legacy Cloudinary or other external URL — redirect browser
     if path.startswith('http://') or path.startswith('https://'):
         from flask import redirect
         response = redirect(path)
@@ -212,10 +223,16 @@ def serve_thumbnail(image_id):
     thumb   = image.thumbnail_path
 
     if thumb:
-        if thumb.startswith('http://') or thumb.startswith('https://'):
+        if thumb.startswith('s3://'):
+            key = thumb[len('s3://'):]
+            url = get_presigned_url(key)
+            if url:
+                from flask import redirect
+                return redirect(url)
+        elif thumb.startswith('http://') or thumb.startswith('https://'):
             from flask import redirect
             return redirect(thumb)
-        if os.path.exists(thumb):
+        elif os.path.exists(thumb):
             return send_file(thumb, mimetype='image/jpeg')
 
     # Fallback to full image
@@ -228,9 +245,14 @@ def delete_image(image_id):
     user_id = get_jwt_identity()
     # SECURITY: only owner can delete their own image
     image = MedicalImage.query.filter_by(id=image_id, uploaded_by=user_id).first_or_404()
-    if image.file_path and not image.file_path.startswith('http'):
-        try: os.remove(image.file_path)
-        except Exception: pass
+    if image.file_path:
+        if image.file_path.startswith('s3://'):
+            s3_delete(image.file_path[len('s3://'):])
+        elif not image.file_path.startswith('http'):
+            try: os.remove(image.file_path)
+            except Exception: pass
+    if image.thumbnail_path and image.thumbnail_path.startswith('s3://'):
+        s3_delete(image.thumbnail_path[len('s3://'):])
     db.session.delete(image)
     db.session.commit()
     return jsonify({'message': 'Image deleted'})

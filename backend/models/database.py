@@ -86,7 +86,9 @@ class MedicalImage(db.Model):
                                     lazy='dynamic', cascade='all, delete-orphan')
 
     def to_dict(self, include_annotations=False):
-        # Expose Cloudinary URLs directly so frontend can load images without auth redirect
+        # S3 keys are stored as "s3://<key>" (private bucket — never exposed
+        # directly). Only legacy external http(s) URLs are exposed as-is;
+        # everything else goes through the authenticated /file proxy route.
         file_path  = self.file_path  or ''
         thumb_path = self.thumbnail_path or ''
         data = {

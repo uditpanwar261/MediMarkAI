@@ -1,6 +1,6 @@
 """
 MediMark AI — AI Inference Routes
-Works with both local file paths and Cloudinary URLs.
+Works with both local file paths and S3-stored images.
 """
 
 from flask import Blueprint, request, jsonify, current_app
@@ -8,6 +8,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from backend.extensions import db
 from backend.models.database import MedicalImage, Annotation, AIInferenceResult
 from backend.ml_models.inference_engine import AIInferenceEngine
+from backend.utils.s3_helper import get_presigned_url, S3_CONFIGURED
 import json, logging, os, tempfile
 
 logger = logging.getLogger(__name__)
@@ -30,21 +31,32 @@ def get_engine() -> AIInferenceEngine:
 def _get_local_path(image: MedicalImage) -> str:
     """
     Return a local file path suitable for OpenCV.
-    If file_path is a Cloudinary URL, download it to /tmp first.
+    If file_path is an s3:// key, generate a presigned URL and download it to
+    /tmp first. Legacy http(s) URLs (old Cloudinary data) are handled the same way.
     """
     path = image.file_path
     if not path:
         raise ValueError("Image has no file path stored")
 
     # Already a local path that exists
-    if not path.startswith('http') and os.path.exists(path):
+    if not path.startswith('http') and not path.startswith('s3://') and os.path.exists(path):
         return path
 
-    # Cloudinary (or any HTTP) URL — download to /tmp
+    import urllib.request
+    ext = os.path.splitext(image.filename)[1] or '.jpg'
+    tmp_path = os.path.join('/tmp', f"medimark_infer_{image.id}{ext}")
+
+    if path.startswith('s3://'):
+        key = path[len('s3://'):]
+        url = get_presigned_url(key)
+        if not url:
+            raise FileNotFoundError(f"Could not generate S3 URL for: {key}")
+        if not os.path.exists(tmp_path):          # cache during same process
+            urllib.request.urlretrieve(url, tmp_path)
+        return tmp_path
+
+    # Legacy Cloudinary (or any HTTP) URL — download to /tmp
     if path.startswith('http'):
-        import urllib.request
-        ext = os.path.splitext(image.filename)[1] or '.jpg'
-        tmp_path = os.path.join('/tmp', f"medimark_infer_{image.id}{ext}")
         if not os.path.exists(tmp_path):          # cache during same process
             urllib.request.urlretrieve(path, tmp_path)
         return tmp_path
@@ -204,8 +216,9 @@ def model_status():
             'exists': os.path.exists(unet_path),
             'status': 'loaded' if os.path.exists(unet_path) else 'mock_mode'
         },
-        'cloudinary': {
-            'configured': bool(os.environ.get('CLOUDINARY_CLOUD_NAME')),
-            'status': 'active' if os.environ.get('CLOUDINARY_CLOUD_NAME') else 'not_configured'
+        'storage': {
+            'backend': 's3' if S3_CONFIGURED else 'local',
+            'configured': S3_CONFIGURED,
+            'status': 'active' if S3_CONFIGURED else 'not_configured'
         }
     })
